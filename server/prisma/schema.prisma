@@ -1,0 +1,66 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  points    Int      @default(0)
+  createdAt DateTime @default(now())
+
+  predictions Prediction[]
+  comments    Comment[]
+}
+
+model Match {
+  id          Int       @id @default(autoincrement())
+  homeTeam    String
+  awayTeam    String
+  matchDate   DateTime
+  homeScore   Int?
+  awayScore   Int?
+  status      String    @default("SCHEDULED")
+  competition String    @default("WORLD_CUP")
+  groupName   String?
+
+  predictions Prediction[]
+  comments    Comment[]
+}
+
+model Prediction {
+  id                  Int @id @default(autoincrement())
+  predictedHomeScore  Int
+  predictedAwayScore  Int
+  points              Int @default(0)
+  createdAt           DateTime @default(now())
+  userId              Int
+  matchId             Int
+
+  user  User  @relation(fields: [userId], references: [id])
+  match Match @relation(fields: [matchId], references: [id])
+
+  @@unique([userId, matchId])
+}
+
+model Comment {
+  id        Int       @id @default(autoincrement())
+  content   String
+  createdAt DateTime  @default(now())
+  userId    Int
+  matchId   Int
+  parentId  Int?
+
+  user   User    @relation(fields: [userId], references: [id])
+  match  Match   @relation(fields: [matchId], references: [id])
+  parent Comment? @relation("CommentReplies", fields: [parentId], references: [id])
+  replies Comment[] @relation("CommentReplies")
+}

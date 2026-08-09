@@ -1,0 +1,20 @@
+version: "3.8"
+
+services:
+  server:
+    build: ./server
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=file:./prisma/data/dev.db
+      - JWT_SECRET=your-secret
+      - PORT=3000
+    volumes:
+      - ./server/prisma/data:/app/prisma/data
+
+  client:
+    build: ./client
+    ports:
+      - "5173:5173"
+    depends_on:
+      - server
