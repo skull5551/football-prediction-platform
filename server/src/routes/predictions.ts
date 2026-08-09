@@ -1,7 +1,6 @@
-import { Router, Response } from 'express';
+import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
-import type { Request } from '../middleware/auth';
 
 const router = Router();
 
@@ -73,7 +72,7 @@ router.get('/match/:matchId', async (req: Request, res: Response) => {
     const matchId = Number(req.params.matchId);
     const sort = req.query.sort as string | undefined;
 
-    const orderBy = sort === 'points' ? { points: 'desc' } : { createdAt: 'desc' };
+    const orderBy = sort === 'points' ? { points: 'desc' as const } : { createdAt: 'desc' as const };
 
     const predictions = await prisma.prediction.findMany({
       where: { matchId },

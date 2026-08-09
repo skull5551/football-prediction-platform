@@ -1,14 +1,14 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 
 import authRoutes from './routes/auth';
 import matchesRoutes from './routes/matches';
 import predictionsRoutes from './routes/predictions';
 import leaderboardRoutes from './routes/leaderboard';
 import commentsRoutes from './routes/comments';
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
