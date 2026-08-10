@@ -1,70 +1,43 @@
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import Layout from './components/Layout';
+import HomePage from './pages/HomePage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import MatchDetailPage from './pages/MatchDetailPage';
+import LeaderboardPage from './pages/LeaderboardPage';
 
-function HomePage() {
-  return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold mb-4">首页</h1>
-      <p className="mb-4">欢迎来到足球预测平台</p>
-      <nav className="flex gap-4">
-        <Link to="/login" className="text-blue-500 hover:underline">登录</Link>
-        <Link to="/register" className="text-blue-500 hover:underline">注册</Link>
-        <Link to="/leaderboard" className="text-blue-500 hover:underline">排行榜</Link>
-      </nav>
-    </div>
-  );
-}
+function AppRoutes() {
+  const { loading } = useAuth();
 
-function LoginPage() {
-  return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold mb-4">登录</h1>
-      <p className="mb-4">登录页面占位</p>
-      <Link to="/" className="text-blue-500 hover:underline">返回首页</Link>
-    </div>
-  );
-}
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-gray-500">加载中...</p>
+      </div>
+    );
+  }
 
-function RegisterPage() {
   return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold mb-4">注册</h1>
-      <p className="mb-4">注册页面占位</p>
-      <Link to="/" className="text-blue-500 hover:underline">返回首页</Link>
-    </div>
-  );
-}
-
-function MatchDetailPage() {
-  return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold mb-4">比赛详情</h1>
-      <p className="mb-4">比赛详情页面占位</p>
-      <Link to="/" className="text-blue-500 hover:underline">返回首页</Link>
-    </div>
-  );
-}
-
-function LeaderboardPage() {
-  return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold mb-4">排行榜</h1>
-      <p className="mb-4">排行榜页面占位</p>
-      <Link to="/" className="text-blue-500 hover:underline">返回首页</Link>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route element={<Layout />}>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/matches/:id" element={<MatchDetailPage />} />
+          <Route path="/leaderboard" element={<LeaderboardPage />} />
+        </Route>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/matches/:id" element={<MatchDetailPage />} />
-        <Route path="/leaderboard" element={<LeaderboardPage />} />
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
   );
 }
 
