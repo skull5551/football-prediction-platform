@@ -1,20 +1,20 @@
-version: "3.8"
-
 services:
   server:
     build: ./server
     ports:
       - "3000:3000"
-    environment:
-      - DATABASE_URL=file:./prisma/data/dev.db
-      - JWT_SECRET=your-secret
-      - PORT=3000
     volumes:
       - ./server/prisma/data:/app/prisma/data
+      - ./server/uploads:/app/uploads
+    environment:
+      - DATABASE_URL=file:./prisma/data/dev.db
+      - JWT_SECRET=your-secret-key
+      - PORT=3000
+      - NODE_ENV=production
 
   client:
     build: ./client
     ports:
-      - "5173:5173"
+      - "80:80"
     depends_on:
       - server
