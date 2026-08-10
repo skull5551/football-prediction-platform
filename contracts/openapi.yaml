@@ -1,0 +1,834 @@
+openapi: 3.0.3
+info:
+  title: Football Prediction Platform API
+  version: 1.0.0
+  description: |
+    Fullstack football prediction platform API.
+
+    ## Concurrency Constraints
+
+    - **Predictions upsert**: Submitting a prediction uses an upsert operation
+      with a unique constraint on `(userId, matchId)`. If a user submits a
+      prediction for a match they have already predicted, the existing record
+      is updated rather than creating a duplicate.
+
+    - **Match settlement transaction**: Updating a match score via
+      `PATCH /api/matches/{id}` wraps the update and all settlement logic in a
+      `prisma.$transaction`. When the match status transitions to `FINISHED`
+      and both scores are present, the transaction atomically:
+      1. Updates the match record (score + status).
+      2. Recalculates points for every prediction on that match.
+      3. Updates each prediction's `points` field.
+      4. Adjusts each user's total `points` by
+         `oldPoints - pred.points + newPoints`.
+
+      This ensures no double-settlement or partial updates occur under
+      concurrent PATCH requests — the second request sees the match as
+      already `FINISHED` (or the transaction is serialized) and the
+      idempotent formula prevents duplicate point accumulation.
+
+servers:
+  - url: http://localhost:3000/api
+    description: Local development server
+
+tags:
+  - name: Auth
+    description: User registration, login, and profile
+  - name: Matches
+    description: Match CRUD and score settlement
+  - name: Predictions
+    description: Submit and retrieve predictions
+  - name: Leaderboard
+    description: User ranking by points
+  - name: Comments
+    description: Match discussion threads
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Username already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Username already exists
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login with username and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Invalid credentials
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current user profile
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: User not found
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /matches:
+    get:
+      tags: [Matches]
+      summary: List matches
+      description: Returns all matches ordered by matchDate ascending. Supports filtering by status and competition.
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [SCHEDULED, IN_PROGRESS, FINISHED]
+          description: Filter by match status
+        - name: competition
+          in: query
+          schema:
+            type: string
+            enum: [WORLD_CUP, SCOTTISH_PREM]
+          description: Filter by competition
+      responses:
+        '200':
+          description: List of matches
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  matches:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MatchWithCounts'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      tags: [Matches]
+      summary: Create a new match
+      description: Creates a match with status SCHEDULED. Requires authentication.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MatchCreateRequest'
+      responses:
+        '201':
+          description: Match created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  match:
+                    $ref: '#/components/schemas/Match'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /matches/{id}:
+    get:
+      tags: [Matches]
+      summary: Get match detail
+      description: Returns a single match with all predictions and comment count.
+      parameters:
+        - $ref: '#/components/parameters/MatchId'
+      responses:
+        '200':
+          description: Match detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  match:
+                    $ref: '#/components/schemas/MatchDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    patch:
+      tags: [Matches]
+      summary: Update match score and status
+      description: |
+        Updates match score and/or status. Requires authentication.
+
+        **Settlement logic**: When the match status transitions to `FINISHED`
+        and both `homeScore` and `awayScore` are present, the entire settlement
+        is executed inside a `prisma.$transaction`:
+        - Points are recalculated for every prediction on this match.
+        - Each prediction's `points` field is updated.
+        - Each user's total `points` is adjusted by
+          `oldPoints - pred.oldPoints + newPoints`.
+
+        The settlement is idempotent — if a second concurrent PATCH arrives,
+        the transaction is serialized (SQLite write lock) and the formula
+        `oldPoints - pred.points + newPoints` prevents double accumulation.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MatchId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MatchUpdateRequest'
+      responses:
+        '200':
+          description: Match updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  match:
+                    $ref: '#/components/schemas/Match'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /predictions:
+    post:
+      tags: [Predictions]
+      summary: Submit or update a prediction
+      description: |
+        Submits a prediction for a scheduled match. Requires authentication.
+
+        **Upsert with unique constraint**: The prediction is created or updated
+        via an upsert on the composite unique key `(userId, matchId)`. If the
+        user has already predicted on this match, the existing record is
+        updated with the new scores — no duplicate predictions are created.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PredictionCreateRequest'
+      responses:
+        '201':
+          description: Prediction created or updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  prediction:
+                    $ref: '#/components/schemas/Prediction'
+        '400':
+          description: Validation error or match not open
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missingFields:
+                  value:
+                    error: matchId, predictedHomeScore and predictedAwayScore are required
+                matchClosed:
+                  value:
+                    error: Match is no longer open for predictions
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /predictions/mine:
+    get:
+      tags: [Predictions]
+      summary: Get current user's predictions
+      description: Returns all predictions by the authenticated user, ordered by creation date descending, with match details included.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User's predictions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  predictions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PredictionWithMatch'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /predictions/match/{matchId}:
+    get:
+      tags: [Predictions]
+      summary: Get all predictions for a match
+      description: Returns all predictions for a specific match, optionally sorted by points or creation date.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MatchId'
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [points, createdAt]
+            default: createdAt
+          description: Sort order — `points` for descending points, `createdAt` for descending date
+      responses:
+        '200':
+          description: Predictions for the match
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  predictions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PredictionWithUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /leaderboard:
+    get:
+      tags: [Leaderboard]
+      summary: Get leaderboard
+      description: Returns all users ranked by total points in descending order.
+      responses:
+        '200':
+          description: Leaderboard
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  leaderboard:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LeaderboardEntry'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /comments/match/{matchId}:
+    get:
+      tags: [Comments]
+      summary: Get comments for a match
+      description: Returns all comments for a match as a flat list ordered by creation date ascending. Clients should organize into a tree using the `parentId` field.
+      parameters:
+        - $ref: '#/components/parameters/MatchId'
+      responses:
+        '200':
+          description: Comments for the match
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  comments:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Comment'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /comments:
+    post:
+      tags: [Comments]
+      summary: Post a comment or reply
+      description: Creates a comment on a match. If `parentId` is provided, the comment is a reply to the parent comment. Requires authentication.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentCreateRequest'
+      responses:
+        '201':
+          description: Comment created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  comment:
+                    $ref: '#/components/schemas/Comment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Match or parent comment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                matchNotFound:
+                  value:
+                    error: Match not found
+                parentNotFound:
+                  value:
+                    error: Parent comment not found
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /comments/{id}:
+    delete:
+      tags: [Comments]
+      summary: Delete a comment
+      description: Deletes a comment. Only the comment author or a user with username `admin` can delete. Requires authentication.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Comment deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Comment deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Forbidden — not the author or admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Forbidden
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from /auth/register or /auth/login. Send as `Authorization: Bearer <token>`.
+
+  parameters:
+    MatchId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: Match ID
+
+  responses:
+    BadRequest:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Username and password are required
+    Unauthorized:
+      description: Missing or invalid authentication
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Unauthorized
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Match not found
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Internal server error
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+      required: [error]
+
+    RegisterRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          example: testuser1
+        password:
+          type: string
+          format: password
+          example: password123
+      required: [username, password]
+
+    LoginRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          example: testuser1
+        password:
+          type: string
+          format: password
+          example: password123
+      required: [username, password]
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT token for authentication
+          example: eyJhbGciOiJIUzI1NiIs...
+        user:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 1
+            username:
+              type: string
+              example: testuser1
+            points:
+              type: integer
+              example: 0
+          required: [id, username, points]
+      required: [token, user]
+
+    MeResponse:
+      type: object
+      properties:
+        user:
+          type: object
+          properties:
+            id:
+              type: integer
+            username:
+              type: string
+            points:
+              type: integer
+            createdAt:
+              type: string
+              format: date-time
+          required: [id, username, points, createdAt]
+      required: [user]
+
+    Match:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        homeTeam:
+          type: string
+          example: Brazil
+        awayTeam:
+          type: string
+          example: Germany
+        matchDate:
+          type: string
+          format: date-time
+          example: '2026-06-01T15:00:00.000Z'
+        homeScore:
+          type: integer
+          nullable: true
+          example: 2
+        awayScore:
+          type: integer
+          nullable: true
+          example: 1
+        status:
+          type: string
+          enum: [SCHEDULED, IN_PROGRESS, FINISHED]
+          example: FINISHED
+        competition:
+          type: string
+          enum: [WORLD_CUP, SCOTTISH_PREM]
+          example: WORLD_CUP
+        groupName:
+          type: string
+          nullable: true
+          example: Group A
+      required: [id, homeTeam, awayTeam, matchDate, homeScore, awayScore, status, competition, groupName]
+
+    MatchWithCounts:
+      allOf:
+        - $ref: '#/components/schemas/Match'
+        - type: object
+          properties:
+            _count:
+              type: object
+              properties:
+                predictions:
+                  type: integer
+                comments:
+                  type: integer
+
+    MatchDetail:
+      allOf:
+        - $ref: '#/components/schemas/Match'
+        - type: object
+          properties:
+            predictions:
+              type: array
+              items:
+                $ref: '#/components/schemas/PredictionWithUser'
+            _count:
+              type: object
+              properties:
+                comments:
+                  type: integer
+
+    MatchCreateRequest:
+      type: object
+      properties:
+        homeTeam:
+          type: string
+          example: Brazil
+        awayTeam:
+          type: string
+          example: Germany
+        matchDate:
+          type: string
+          format: date-time
+          example: '2026-06-01T15:00:00.000Z'
+        competition:
+          type: string
+          enum: [WORLD_CUP, SCOTTISH_PREM]
+          default: WORLD_CUP
+        groupName:
+          type: string
+          nullable: true
+          example: Group A
+      required: [homeTeam, awayTeam, matchDate]
+
+    MatchUpdateRequest:
+      type: object
+      properties:
+        homeScore:
+          type: integer
+          example: 2
+        awayScore:
+          type: integer
+          example: 1
+        status:
+          type: string
+          enum: [SCHEDULED, IN_PROGRESS, FINISHED]
+          example: FINISHED
+      description: All fields are optional. When status transitions to FINISHED and both scores are present, settlement runs inside a transaction.
+
+    Prediction:
+      type: object
+      properties:
+        id:
+          type: integer
+        predictedHomeScore:
+          type: integer
+          example: 2
+        predictedAwayScore:
+          type: integer
+          example: 1
+        points:
+          type: integer
+          description: Calculated points (0 until match is settled)
+          example: 3
+        createdAt:
+          type: string
+          format: date-time
+        userId:
+          type: integer
+        matchId:
+          type: integer
+      required: [id, predictedHomeScore, predictedAwayScore, points, createdAt, userId, matchId]
+
+    PredictionWithUser:
+      allOf:
+        - $ref: '#/components/schemas/Prediction'
+        - type: object
+          properties:
+            user:
+              type: object
+              properties:
+                id:
+                  type: integer
+                username:
+                  type: string
+              required: [id, username]
+
+    PredictionWithMatch:
+      allOf:
+        - $ref: '#/components/schemas/Prediction'
+        - type: object
+          properties:
+            match:
+              $ref: '#/components/schemas/Match'
+
+    PredictionCreateRequest:
+      type: object
+      properties:
+        matchId:
+          type: integer
+          example: 1
+        predictedHomeScore:
+          type: integer
+          example: 2
+        predictedAwayScore:
+          type: integer
+          example: 1
+      required: [matchId, predictedHomeScore, predictedAwayScore]
+      description: Uses upsert on unique key (userId, matchId). Duplicate submissions update the existing prediction.
+
+    LeaderboardEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        points:
+          type: integer
+      required: [id, username, points]
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: integer
+        content:
+          type: string
+          example: Great match!
+        createdAt:
+          type: string
+          format: date-time
+        userId:
+          type: integer
+        matchId:
+          type: integer
+        parentId:
+          type: integer
+          nullable: true
+          description: ID of the parent comment if this is a reply, null for top-level comments
+        user:
+          type: object
+          properties:
+            id:
+              type: integer
+            username:
+              type: string
+          required: [id, username]
+      required: [id, content, createdAt, userId, matchId, parentId, user]
+
+    CommentCreateRequest:
+      type: object
+      properties:
+        matchId:
+          type: integer
+          example: 1
+        content:
+          type: string
+          example: Great match!
+        parentId:
+          type: integer
+          nullable: true
+          description: ID of the parent comment if this is a reply
+          example: 5
+      required: [matchId, content]
