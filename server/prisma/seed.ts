@@ -50,10 +50,12 @@ async function main() {
     data: { username: 'testuser2', password },
   });
 
-  const matches = await Promise.all([
+  // ===== 世界杯 WORLD_CUP (8 matches: 4 FINISHED + 4 SCHEDULED) =====
+  const wcMatches = await Promise.all([
+    // 4 FINISHED
     prisma.match.create({
       data: {
-        homeTeam: 'Brazil', awayTeam: 'Germany',
+        homeTeam: '巴西', awayTeam: '德国',
         matchDate: new Date('2026-06-01T15:00:00Z'),
         homeScore: 2, awayScore: 1,
         status: 'FINISHED', competition: 'WORLD_CUP', groupName: 'Group A',
@@ -61,7 +63,7 @@ async function main() {
     }),
     prisma.match.create({
       data: {
-        homeTeam: 'Argentina', awayTeam: 'France',
+        homeTeam: '阿根廷', awayTeam: '法国',
         matchDate: new Date('2026-06-05T15:00:00Z'),
         homeScore: 3, awayScore: 2,
         status: 'FINISHED', competition: 'WORLD_CUP', groupName: 'Group B',
@@ -69,7 +71,7 @@ async function main() {
     }),
     prisma.match.create({
       data: {
-        homeTeam: 'Spain', awayTeam: 'Netherlands',
+        homeTeam: '西班牙', awayTeam: '荷兰',
         matchDate: new Date('2026-06-10T15:00:00Z'),
         homeScore: 1, awayScore: 1,
         status: 'FINISHED', competition: 'WORLD_CUP', groupName: 'Group C',
@@ -77,85 +79,144 @@ async function main() {
     }),
     prisma.match.create({
       data: {
-        homeTeam: 'Japan', awayTeam: 'South Korea',
+        homeTeam: '日本', awayTeam: '韩国',
         matchDate: new Date('2026-06-15T15:00:00Z'),
         homeScore: 0, awayScore: 0,
         status: 'FINISHED', competition: 'WORLD_CUP', groupName: 'Group E',
       },
     }),
+    // 4 SCHEDULED
     prisma.match.create({
       data: {
-        homeTeam: 'England', awayTeam: 'Portugal',
-        matchDate: new Date('2026-09-01T15:00:00Z'),
+        homeTeam: '英格兰', awayTeam: '葡萄牙',
+        matchDate: new Date('2026-07-20T15:00:00Z'),
         status: 'SCHEDULED', competition: 'WORLD_CUP', groupName: 'Group D',
       },
     }),
     prisma.match.create({
       data: {
-        homeTeam: 'Mexico', awayTeam: 'USA',
-        matchDate: new Date('2026-09-05T15:00:00Z'),
+        homeTeam: '墨西哥', awayTeam: '美国',
+        matchDate: new Date('2026-07-24T15:00:00Z'),
         status: 'SCHEDULED', competition: 'WORLD_CUP', groupName: 'Group A',
       },
     }),
     prisma.match.create({
       data: {
-        homeTeam: 'Celtic', awayTeam: 'Rangers',
-        matchDate: new Date('2026-07-01T15:00:00Z'),
-        homeScore: 2, awayScore: 0,
+        homeTeam: '意大利', awayTeam: '克罗地亚',
+        matchDate: new Date('2026-07-28T15:00:00Z'),
+        status: 'SCHEDULED', competition: 'WORLD_CUP', groupName: 'Group F',
+      },
+    }),
+    prisma.match.create({
+      data: {
+        homeTeam: '比利时', awayTeam: '瑞士',
+        matchDate: new Date('2026-07-30T15:00:00Z'),
+        status: 'SCHEDULED', competition: 'WORLD_CUP', groupName: 'Group G',
+      },
+    }),
+  ]);
+
+  // ===== 苏超 SCOTTISH_PREM (8 matches: 4 FINISHED + 4 SCHEDULED) =====
+  const splMatches = await Promise.all([
+    // 4 FINISHED
+    prisma.match.create({
+      data: {
+        homeTeam: '南京队', awayTeam: '苏州队',
+        matchDate: new Date('2026-06-20T15:00:00Z'),
+        homeScore: 2, awayScore: 1,
         status: 'FINISHED', competition: 'SCOTTISH_PREM',
       },
     }),
     prisma.match.create({
       data: {
-        homeTeam: 'Hibernian', awayTeam: 'Dundee United',
+        homeTeam: '无锡队', awayTeam: '常州队',
+        matchDate: new Date('2026-06-25T15:00:00Z'),
+        homeScore: 0, awayScore: 0,
+        status: 'FINISHED', competition: 'SCOTTISH_PREM',
+      },
+    }),
+    prisma.match.create({
+      data: {
+        homeTeam: '南通队', awayTeam: '扬州队',
+        matchDate: new Date('2026-06-28T15:00:00Z'),
+        homeScore: 3, awayScore: 1,
+        status: 'FINISHED', competition: 'SCOTTISH_PREM',
+      },
+    }),
+    prisma.match.create({
+      data: {
+        homeTeam: '徐州队', awayTeam: '镇江队',
+        matchDate: new Date('2026-07-02T15:00:00Z'),
+        homeScore: 1, awayScore: 2,
+        status: 'FINISHED', competition: 'SCOTTISH_PREM',
+      },
+    }),
+    // 4 SCHEDULED
+    prisma.match.create({
+      data: {
+        homeTeam: '泰州队', awayTeam: '盐城队',
+        matchDate: new Date('2026-07-05T15:00:00Z'),
+        status: 'SCHEDULED', competition: 'SCOTTISH_PREM',
+      },
+    }),
+    prisma.match.create({
+      data: {
+        homeTeam: '淮安队', awayTeam: '连云港队',
         matchDate: new Date('2026-07-10T15:00:00Z'),
-        homeScore: 1, awayScore: 1,
-        status: 'FINISHED', competition: 'SCOTTISH_PREM',
-      },
-    }),
-    prisma.match.create({
-      data: {
-        homeTeam: 'Aberdeen', awayTeam: 'Hearts',
-        matchDate: new Date('2026-09-10T15:00:00Z'),
         status: 'SCHEDULED', competition: 'SCOTTISH_PREM',
       },
     }),
     prisma.match.create({
       data: {
-        homeTeam: 'Kilmarnock', awayTeam: 'St Mirren',
-        matchDate: new Date('2026-09-15T15:00:00Z'),
+        homeTeam: '宿迁队', awayTeam: '南京队',
+        matchDate: new Date('2026-07-15T15:00:00Z'),
         status: 'SCHEDULED', competition: 'SCOTTISH_PREM',
       },
     }),
     prisma.match.create({
       data: {
-        homeTeam: 'Motherwell', awayTeam: 'Ross County',
-        matchDate: new Date('2026-10-01T15:00:00Z'),
+        homeTeam: '苏州队', awayTeam: '无锡队',
+        matchDate: new Date('2026-07-18T15:00:00Z'),
         status: 'SCHEDULED', competition: 'SCOTTISH_PREM',
       },
     }),
   ]);
 
+  const allMatches = [...wcMatches, ...splMatches];
+
   let user1Points = 0;
   let user2Points = 0;
 
+  // ===== 已结束比赛的预测 (部分猜中部分未中) =====
   const finishedPredicts = [
-    { uid: user1.id, mid: matches[0].id, ph: 2, pa: 1 },
-    { uid: user2.id, mid: matches[0].id, ph: 1, pa: 1 },
-    { uid: user1.id, mid: matches[1].id, ph: 3, pa: 0 },
-    { uid: user2.id, mid: matches[1].id, ph: 2, pa: 2 },
-    { uid: user1.id, mid: matches[2].id, ph: 1, pa: 1 },
-    { uid: user2.id, mid: matches[2].id, ph: 2, pa: 0 },
-    { uid: user1.id, mid: matches[3].id, ph: 0, pa: 0 },
-    { uid: user2.id, mid: matches[3].id, ph: 1, pa: 0 },
-    { uid: user1.id, mid: matches[6].id, ph: 1, pa: 0 },
-    { uid: user2.id, mid: matches[6].id, ph: 2, pa: 0 },
-    { uid: user1.id, mid: matches[7].id, ph: 1, pa: 0 },
-    { uid: user2.id, mid: matches[7].id, ph: 1, pa: 1 },
+    // WC match 0: 巴西 2-1 德国
+    { uid: user1.id, mid: allMatches[0].id, ph: 2, pa: 1 },  // exact → 3
+    { uid: user2.id, mid: allMatches[0].id, ph: 1, pa: 1 },  // wrong → 0
+    // WC match 1: 阿根廷 3-2 法国
+    { uid: user1.id, mid: allMatches[1].id, ph: 3, pa: 0 },  // trend+home → 2
+    { uid: user2.id, mid: allMatches[1].id, ph: 2, pa: 2 },  // wrong → 0
+    // WC match 2: 西班牙 1-1 荷兰
+    { uid: user1.id, mid: allMatches[2].id, ph: 1, pa: 1 },  // exact → 3
+    { uid: user2.id, mid: allMatches[2].id, ph: 2, pa: 0 },  // wrong → 0
+    // WC match 3: 日本 0-0 韩国
+    { uid: user1.id, mid: allMatches[3].id, ph: 0, pa: 0 },  // exact → 3
+    { uid: user2.id, mid: allMatches[3].id, ph: 1, pa: 0 },  // wrong → 0
+    // SPL match 8: 南京队 2-1 苏州队
+    { uid: user1.id, mid: allMatches[8].id, ph: 1, pa: 0 },  // trend only → 1
+    { uid: user2.id, mid: allMatches[8].id, ph: 2, pa: 1 },  // exact → 3
+    // SPL match 9: 无锡队 0-0 常州队
+    { uid: user1.id, mid: allMatches[9].id, ph: 0, pa: 0 },  // exact → 3
+    { uid: user2.id, mid: allMatches[9].id, ph: 1, pa: 1 },  // trend only → 1
+    // SPL match 10: 南通队 3-1 扬州队
+    { uid: user1.id, mid: allMatches[10].id, ph: 2, pa: 1 }, // trend+away → 2
+    { uid: user2.id, mid: allMatches[10].id, ph: 3, pa: 0 }, // trend+home → 2
+    // SPL match 11: 徐州队 1-2 镇江队
+    { uid: user1.id, mid: allMatches[11].id, ph: 0, pa: 1 }, // trend only → 1
+    { uid: user2.id, mid: allMatches[11].id, ph: 1, pa: 2 }, // exact → 3
   ];
 
   for (const p of finishedPredicts) {
-    const m = matches.find((x) => x.id === p.mid);
+    const m = allMatches.find((x) => x.id === p.mid);
     if (!m || m.homeScore === null || m.awayScore === null) continue;
     const pts = calculatePoints(m.homeScore, m.awayScore, p.ph, p.pa);
     await prisma.prediction.create({
@@ -169,15 +230,24 @@ async function main() {
     else user2Points += pts;
   }
 
+  // ===== 未开始比赛的预测 =====
   const scheduledPredicts = [
-    { uid: user1.id, mid: matches[4].id, ph: 2, pa: 1 },
-    { uid: user2.id, mid: matches[4].id, ph: 1, pa: 1 },
-    { uid: user1.id, mid: matches[5].id, ph: 0, pa: 0 },
-    { uid: user2.id, mid: matches[5].id, ph: 2, pa: 0 },
-    { uid: user1.id, mid: matches[8].id, ph: 1, pa: 0 },
-    { uid: user2.id, mid: matches[8].id, ph: 0, pa: 1 },
-    { uid: user2.id, mid: matches[9].id, ph: 2, pa: 1 },
-    { uid: user1.id, mid: matches[10].id, ph: 1, pa: 1 },
+    { uid: user1.id, mid: allMatches[4].id, ph: 2, pa: 1 },
+    { uid: user2.id, mid: allMatches[4].id, ph: 1, pa: 1 },
+    { uid: user1.id, mid: allMatches[5].id, ph: 0, pa: 0 },
+    { uid: user2.id, mid: allMatches[5].id, ph: 2, pa: 0 },
+    { uid: user1.id, mid: allMatches[6].id, ph: 1, pa: 0 },
+    { uid: user2.id, mid: allMatches[6].id, ph: 0, pa: 1 },
+    { uid: user1.id, mid: allMatches[7].id, ph: 2, pa: 2 },
+    { uid: user2.id, mid: allMatches[7].id, ph: 1, pa: 0 },
+    { uid: user1.id, mid: allMatches[12].id, ph: 1, pa: 0 },
+    { uid: user2.id, mid: allMatches[12].id, ph: 0, pa: 1 },
+    { uid: user1.id, mid: allMatches[13].id, ph: 2, pa: 1 },
+    { uid: user2.id, mid: allMatches[13].id, ph: 1, pa: 1 },
+    { uid: user1.id, mid: allMatches[14].id, ph: 0, pa: 0 },
+    { uid: user2.id, mid: allMatches[14].id, ph: 1, pa: 2 },
+    { uid: user1.id, mid: allMatches[15].id, ph: 2, pa: 0 },
+    { uid: user2.id, mid: allMatches[15].id, ph: 1, pa: 1 },
   ];
 
   for (const p of scheduledPredicts) {
@@ -192,30 +262,55 @@ async function main() {
   await prisma.user.update({ where: { id: user1.id }, data: { points: user1Points } });
   await prisma.user.update({ where: { id: user2.id }, data: { points: user2Points } });
 
-  const comment1 = await prisma.comment.create({
+  // ===== 评论 (2 场已结束比赛，含树形回复) =====
+  // 巴西 vs 德国
+  const c1 = await prisma.comment.create({
     data: {
-      content: 'Great match! Brazil played really well.',
-      userId: user1.id, matchId: matches[0].id,
+      content: '巴西踢得太好了，进攻火力全开！',
+      userId: user1.id, matchId: allMatches[0].id,
     },
   });
-  const comment2 = await prisma.comment.create({
+  const c2 = await prisma.comment.create({
     data: {
-      content: 'Germany could have done better in defense.',
-      userId: user2.id, matchId: matches[0].id, parentId: comment1.id,
+      content: '德国防守端问题很大，需要调整。',
+      userId: user2.id, matchId: allMatches[0].id, parentId: c1.id,
     },
   });
   await prisma.comment.create({
     data: {
-      content: "Agreed, but Brazil's attack was unstoppable today.",
-      userId: user1.id, matchId: matches[0].id, parentId: comment2.id,
+      content: '同意，不过巴西的进攻确实难以阻挡。',
+      userId: user1.id, matchId: allMatches[0].id, parentId: c2.id,
     },
   });
 
+  // 南京队 vs 苏州队
+  const c4 = await prisma.comment.create({
+    data: {
+      content: '南京队主场优势明显，2-1 合理。',
+      userId: user2.id, matchId: allMatches[8].id,
+    },
+  });
+  const c5 = await prisma.comment.create({
+    data: {
+      content: '苏州队下半场反击不错，可惜没扳平。',
+      userId: user1.id, matchId: allMatches[8].id, parentId: c4.id,
+    },
+  });
+  await prisma.comment.create({
+    data: {
+      content: '下次苏州队主场应该能赢回来。',
+      userId: user2.id, matchId: allMatches[8].id, parentId: c5.id,
+    },
+  });
+
+  const finishedCount = allMatches.filter((m) => m.status === 'FINISHED').length;
+  const scheduledCount = allMatches.filter((m) => m.status === 'SCHEDULED').length;
+
   console.log('Seed data inserted successfully!');
   console.log(`Users: testuser1 (${user1Points} pts), testuser2 (${user2Points} pts)`);
-  console.log(`Matches: ${matches.length} (5 FINISHED, 6 SCHEDULED)`);
+  console.log(`Matches: ${allMatches.length} (${finishedCount} FINISHED, ${scheduledCount} SCHEDULED)`);
   console.log(`Predictions: ${finishedPredicts.length + scheduledPredicts.length}`);
-  console.log('Comments: 3');
+  console.log(`Comments: 6`);
 }
 
 main()
