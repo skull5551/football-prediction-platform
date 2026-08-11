@@ -150,3 +150,34 @@ Tests:       24 passed, 24 total
 ```
 
 这证明了事务原子性 + 幂等公式 + 唯一约束的组合方案有效防止了并发场景下的积分重复/遗漏问题。
+
+---
+
+## 三、测试结果与验收标准 (AC) 对照
+
+| AC | 功能点 | 测试文件 | 测试用例 | 状态 |
+|----|--------|----------|----------|------|
+| AC1 | 用户注册 | auth.test.ts | `POST /api/auth/register` 返回 token + 用户信息 | ✅ 通过 |
+| AC2 | 用户登录 | auth.test.ts | `POST /api/auth/login` 验证密码后返回 token | ✅ 通过 |
+| AC3 | 获取当前用户 | auth.test.ts | `GET /api/auth/me` 需 Bearer token | ✅ 通过 |
+| AC4 | 重复注册报错 | auth.test.ts | 已存在用户名返回 409 | ✅ 通过 |
+| AC5 | 赛事列表浏览 | HomePage.test.tsx | HomePage 渲染比赛卡片 (巴西/德国等) | ✅ 通过 |
+| AC6 | 赛事状态筛选 | HomePage.test.tsx | 筛选器渲染 (全部/未开始/进行中/已结束) | ✅ 通过 |
+| AC7 | 提交预测 (upsert) | predictions.test.ts | `POST /api/predictions` 创建 + 重复提交更新 | ✅ 通过 |
+| AC8 | 查看我的预测 | predictions.test.ts | `GET /api/predictions/mine` 返回当前用户预测 | ✅ 通过 |
+| AC9 | 算分逻辑 - 精确比分 | scoring.test.ts | 预测 2-1 实际 2-1 → 3 分 | ✅ 通过 |
+| AC10 | 算分逻辑 - 正确趋势+一比分 | scoring.test.ts | 预测 3-0 实际 3-2 → 2 分 | ✅ 通过 |
+| AC11 | 算分逻辑 - 仅正确趋势 | scoring.test.ts | 预测 1-0 实际 2-1 → 1 分 | ✅ 通过 |
+| AC12 | 算分逻辑 - 错误预测 | scoring.test.ts | 预测 1-1 实际 2-1 → 0 分 | ✅ 通过 |
+| AC13 | 结算积分 (事务) | concurrency.test.ts | `PATCH /api/matches/:id` 结算后预测积分正确 | ✅ 通过 |
+| AC14 | 并发结算不重复 | concurrency.test.ts | `Promise.all` 双请求 → 积分 = 3 (非 6) | ✅ 通过 |
+| AC15 | 评论树形回复 | — (手动验证) | `POST /api/comments` 含 parentId 形成嵌套 | ✅ 种子数据验证 |
+| AC16 | 排行榜 | — (手动验证) | `GET /api/leaderboard` 按积分降序 | ✅ 种子数据验证 |
+
+**总计：26 个自动化测试全部通过 (后端 24 + 前端 2)，2 项手动验证通过。**
+
+---
+
+## 四、待办备注
+
+> **⚠️ 手动确认**：请检查 GitHub 仓库 `https://github.com/skull5551/football-prediction-platform` 是否已邀请 `sunshinezxf@hotmail.com` 为协作者（Settings → Collaborators）。若仓库为公开仓库则无需邀请。
